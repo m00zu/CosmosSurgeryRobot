@@ -1,0 +1,159 @@
+<!-- SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved. -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cosmos3-H-Dreams training sessions</title>
+  <style>
+    /* Same surgical-console theme as /train (see train.html for the token notes). */
+    :root {
+      color-scheme: dark;
+      --bg: #0a0e13; --panel: #0d131a; --raised: #111820; --raised-2: #18212c;
+      --line: #1c2733; --line-2: #2c3a4c;
+      --text: #e6edf3; --soft: #c3ccd8; --muted: #93a1b3; --faint: #5c6b7d;
+      --accent: #3dd6c3; --accent-ink: #062420; --accent-soft: #12202a;
+      --amber: #f5b83d; --red: #ff6b6b; --red-text: #ff8a8a;
+      --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+      font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    [hidden] { display: none !important; }
+    body { background: var(--bg); color: var(--text); margin: 0; }
+    main { max-width: 1240px; margin: auto; padding: 0 max(16px, 2vw) 32px; }
+    a { color: var(--accent); }
+    a:hover { color: #8beadf; }
+    h1 { margin: 0 8px 0 0; font-size: 1.1em; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+    h2 { margin: 28px 0 10px; color: var(--muted); font: 600 11px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; }
+    header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; margin: 0 0 18px; padding: 12px 18px;
+      background: var(--panel); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 14px 14px; }
+    header a { text-decoration: none; }
+    button { background: var(--accent); border: 1px solid transparent; border-radius: 10px; color: var(--accent-ink); cursor: pointer; font: inherit; font-weight: 600; min-height: 40px; padding: 0 16px; }
+    button:hover { filter: brightness(1.08); }
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, tr:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    input, select, textarea { background: var(--raised); border: 1px solid var(--line-2); border-radius: 10px; color: inherit; font: inherit; min-height: 40px; padding: 0 12px; box-sizing: border-box; }
+    textarea { padding: 10px 12px; }
+    #filters { display: flex; flex-wrap: wrap; gap: 10px; }
+    #progress { margin-top: 16px; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+    #progress h2 { margin-top: 0; }
+    #progress-chart { display: block; width: 100%; height: 180px; font-family: system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+    #progress-note, #review-status, #demo-status, #rubric-note { color: var(--muted); font-size: 0.9em; }
+    #rubric { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+    #rubric li { padding: 10px 12px; border-radius: 10px; background: var(--raised); }
+    #rubric .value { color: var(--muted); margin-left: 8px; font: 12px var(--mono); }
+    #rubric input[type="checkbox"] { min-height: 0; width: 18px; height: 18px; accent-color: var(--accent); vertical-align: -3px; margin-right: 8px; }
+    #rubric-section, #save-demo-section { padding: 2px 16px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; margin-top: 20px; }
+    #review-notes { display: block; width: 100%; max-width: 640px; min-height: 5em; margin: 8px 0; box-sizing: border-box; }
+    label[for="review-notes"] { display: block; margin-top: 12px; color: var(--muted); font-size: 0.9em; }
+    #review-total { font: 600 1em var(--mono); }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    #current-mode, #list-status, #detail-status { color: var(--muted); white-space: pre-wrap; }
+    #current-mode { margin-left: auto; font: 500 12px var(--mono); padding: 5px 10px; border: 1px solid var(--line-2); border-radius: 999px; }
+    #current-mode:empty { display: none; }
+    #table-wrap { overflow-x: auto; margin-top: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+    table { border-collapse: collapse; font-size: 0.9em; width: 100%; }
+    th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    tbody tr:last-child td { border-bottom: 0; }
+    td { font-variant-numeric: tabular-nums; }
+    td:nth-child(2), td:nth-child(3), td:nth-child(4) { white-space: normal; overflow-wrap: anywhere; }
+    td:nth-child(3) { overflow-wrap: normal; min-width: 8em; }
+    th { color: var(--muted); cursor: pointer; user-select: none; font: 600 11px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; }
+    th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--text); }
+    th[aria-sort="ascending"]::after { content: " \25B2"; }
+    th[aria-sort="descending"]::after { content: " \25BC"; }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover { background: var(--raised); }
+    td a { color: inherit; text-decoration: none; }
+    td.incomplete { color: var(--amber); }
+    #back { background: transparent; border-color: var(--line-2); color: var(--text); font-weight: 500; }
+    #player { display: block; width: 100%; max-width: 960px; aspect-ratio: 16 / 9; background: black; margin-top: 14px; border: 1px solid var(--line); border-radius: 14px; }
+    #video-message { color: var(--amber); }
+    #timeline { max-width: 960px; margin-top: 10px; border-radius: 8px; }
+    #timeline .marker { position: absolute; top: 0; bottom: 0; cursor: pointer; }
+    #timeline .energy { background: var(--amber); min-width: 2px; z-index: 1; top: 8px; bottom: 8px; border-radius: 3px; }
+    #timeline .incident { background: var(--red); width: 4px; transform: translateX(-50%); z-index: 3; }
+    #timeline .tick { background: #8a93a3; width: 1px; padding: 0 3px; background-clip: content-box; transform: translateX(-50%); z-index: 2; }
+    #timeline .step { background: var(--accent); width: 2px; padding: 0 3px; background-clip: content-box; transform: translateX(-50%); z-index: 2; }
+    #legend { font-size: 0.85em; color: var(--muted); }
+    #legend span { display: inline-block; width: 12px; height: 12px; margin: 0 4px 0 12px; vertical-align: -1px; border-radius: 2px; }
+    #incidents { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+    #incidents li { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 10px; background: var(--raised); overflow-wrap: anywhere; font: 13px var(--mono); color: var(--soft); }
+    #incidents button { min-height: 32px; padding: 0 12px; background: transparent; border-color: var(--red); color: var(--red-text); font: 600 13px var(--mono); font-variant-numeric: tabular-nums; }
+    #summary { display: grid; grid-template-columns: max-content 1fr; gap: 8px 24px; margin: 0; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+    #summary dt { color: var(--muted); }
+    #summary dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3dd6c3" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="2.5"/></svg>Training sessions</h1>
+      <a href="/train">Training ground</a>
+      <a href="/gpu">GPU memory</a>
+      <span id="current-mode" role="status"></span>
+    </header>
+    <section id="list">
+      <div id="filters">
+        <select id="trainee-filter" aria-label="Trainee"><option value="">All trainees</option></select>
+        <select id="exercise-filter" aria-label="Exercise">
+          <option value="">All exercises</option>
+          <option value="free">Free practice</option>
+        </select>
+      </div>
+      <section id="progress" hidden>
+        <h2 id="progress-title">Progress</h2>
+        <svg id="progress-chart" role="img" aria-label="Score per attempt"></svg>
+        <p id="progress-note">Score per attempt; hollow points still await an instructor review.</p>
+      </section>
+      <p id="list-status" role="status"></p>
+      <div id="table-wrap">
+        <table>
+          <thead><tr id="columns"></tr></thead>
+          <tbody id="sessions"></tbody>
+        </table>
+      </div>
+    </section>
+    <section id="detail" hidden>
+      <button id="back">Back to sessions</button>
+      <p id="detail-status" role="status"></p>
+      <video id="player" controls preload="metadata" hidden></video>
+      <p id="video-message" role="status"></p>
+      <div id="timeline" style="position:relative;height:32px;background:#18212c"></div>
+      <p id="legend">
+        Click a marker to play from 3 s before it.
+        <span style="background:#ff6b6b"></span>Incident
+        <span style="background:#f5b83d"></span>Energy on
+        <span style="background:#8a93a3"></span>Reset, pause, resume
+        <span style="background:#3dd6c3"></span>Step done
+      </p>
+      <section id="rubric-section" hidden>
+        <h2 id="rubric-title">Rubric</h2>
+        <p id="rubric-note"></p>
+        <ul id="rubric"></ul>
+        <label for="review-notes">Notes</label>
+        <textarea id="review-notes" maxlength="2000"></textarea>
+        <div class="row">
+          <button id="save-review" type="button">Save review</button>
+          <span id="review-total"></span>
+          <span id="review-status" role="status"></span>
+        </div>
+      </section>
+      <h2>Incidents</h2>
+      <ul id="incidents"></ul>
+      <h2>Summary</h2>
+      <dl id="summary"></dl>
+      <section id="save-demo-section" hidden>
+        <h2>Save as demo</h2>
+        <div class="row">
+          <input id="demo-name" maxlength="60" placeholder="Demo name" aria-label="Demo name">
+          <button id="save-demo" type="button">Save as demo</button>
+          <span id="demo-status" role="status"></span>
+        </div>
+      </section>
+    </section>
+  </main>
+  <script src="/gpu_chart.js" defer></script>
+  <script src="/train_core.js" defer></script>
+  <script src="/dashboard.js" defer></script>
+</body>
+</html>

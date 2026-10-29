@@ -1,0 +1,81 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Training ground for a laptop RTX 5090 (24 GB, sm_120): open https://<server>:8443/train.
+# Starts in Balanced mode (FP8 MLP, bf16 attention); switch modes in /train Settings.
+# Paths are relative to the launch directory.
+runtime:
+  preset: wan-taehv-chunk2-2steps-fademem-compile
+  checkpoint: data_local/checkpoints/c3-h-d_2-step_model_bf16.safetensors
+  offload_understanding: true
+  fp8_generation: true
+  fp8_scope: mlp
+  # Plain-SDPA refresh once FadeMem memory is full (faster; not bit-identical to varlen).
+  steady_refresh_sdpa: true
+  # SageAttention on RTX 50 when installed (scripts/install_sageattention.sh), else SDPA.
+  attention_kernel: auto
+  # Saved prompt K/V: later starts load the model without its understanding weights
+  # (~26 GB less host RAM). The first start builds the file. Every scene must share one prompt.
+  text_cache: data_local/text_kv/c3-h-d_2-step_480x832.pt
+
+headset:
+  preset: headset-base
+  # Play 8-frame chunks as fast as the 30 Hz input fills them, or chunks queue behind playback.
+  display_fps: 30
+  cert: cert.pem
+  key: key.pem
+
+# About the highest values surgeons reached in 40 CMR cholecystectomies (hand motion,
+# Open-H-Embodiment); see SafetyLimits in safety.py for the measured percentiles.
+safety:
+  max_speed_m_s: 0.35
+  max_acceleration_m_s2: 3.0
+  max_rotation_rad_s: 4.0
+  max_energy_s: 10.0
+  max_energy_dose_s: 14.0
+  energy_dose_window_s: 15.0
+  max_energy_sweep_m: 0.10
+
+recording:
+  dir: recordings
+
+# The tools on each instrument. The server ignores a control the instrument lacks,
+# /train shows each instrument's own controls, and courses may only use these tools.
+instruments:
+  left: {name: Grasper, tools: [jaws]}
+  right: {name: Hook, tools: [energy]}
+
+# Guided exercises for /train (Courses button). Remove the block to hide courses.
+courses:
+  dir: cosmos3_h_dreams/courses   # shipped exercises, one YAML per exercise
+  demos_dir: data_local/demos     # demos saved from the dashboard (gitignored)
+
+scenes:
+  - initial_frame: assets/example_data/scenes/*.png
+  # 25 more starts from other CMR cholecystectomies (Open-H-Embodiment, CC BY 4.0); see
+  # assets/scenes/cholecystectomy/README.md. Exercises stay on the first scene above.
+  - {name: chole-01, label: "Cholecystectomy 01 · Dissection beside the liver", initial_frame: assets/scenes/cholecystectomy/ep000061_20s.jpg}
+  - {name: chole-02, label: "Cholecystectomy 02 · Dissection in fat", initial_frame: assets/scenes/cholecystectomy/ep000121_5s.jpg}
+  - {name: chole-03, label: "Cholecystectomy 03 · Gallbladder edge", initial_frame: assets/scenes/cholecystectomy/ep000243_20s.jpg}
+  - {name: chole-04, label: "Cholecystectomy 04 · Calot's triangle", initial_frame: assets/scenes/cholecystectomy/ep000400_10s.jpg}
+  - {name: chole-05, label: "Cholecystectomy 05 · Gallbladder neck", initial_frame: assets/scenes/cholecystectomy/ep000425_35s.jpg}
+  - {name: chole-06, label: "Cholecystectomy 06 · Clips near the liver", initial_frame: assets/scenes/cholecystectomy/ep000546_20s.jpg}
+  - {name: chole-07, label: "Cholecystectomy 07 · Gallbladder, wide view", initial_frame: assets/scenes/cholecystectomy/ep000606_5s.jpg}
+  - {name: chole-08, label: "Cholecystectomy 08 · Gallbladder held up, wide view", initial_frame: assets/scenes/cholecystectomy/ep000728_35s.jpg}
+  - {name: chole-09, label: "Cholecystectomy 09 · Clipped duct", initial_frame: assets/scenes/cholecystectomy/ep001200_10s.jpg}
+  - {name: chole-10, label: "Cholecystectomy 10 · Clips in fat", initial_frame: assets/scenes/cholecystectomy/ep001213_20s.jpg}
+  - {name: chole-11, label: "Cholecystectomy 11 · Oozing field", initial_frame: assets/scenes/cholecystectomy/ep001274_20s.jpg}
+  - {name: chole-12, label: "Cholecystectomy 12 · Liver edge, far view", initial_frame: assets/scenes/cholecystectomy/ep001941_5s.jpg}
+  - {name: chole-13, label: "Cholecystectomy 13 · Fatty neck", initial_frame: assets/scenes/cholecystectomy/ep002062_50s.jpg}
+  - {name: chole-14, label: "Cholecystectomy 14 · Gallbladder over the liver", initial_frame: assets/scenes/cholecystectomy/ep002244_5s.jpg}
+  - {name: chole-15, label: "Cholecystectomy 15 · Gallbladder lifted", start_jaws_closed: [left], initial_frame: assets/scenes/cholecystectomy/ep002300_55s.jpg}
+  - {name: chole-16, label: "Cholecystectomy 16 · Gallbladder grasped", initial_frame: assets/scenes/cholecystectomy/ep002305_5s.jpg}
+  - {name: chole-17, label: "Cholecystectomy 17 · Neck dissection", initial_frame: assets/scenes/cholecystectomy/ep002365_20s.jpg}
+  - {name: chole-18, label: "Cholecystectomy 18 · Gallbladder and liver", initial_frame: assets/scenes/cholecystectomy/ep002426_20s.jpg}
+  - {name: chole-19, label: "Cholecystectomy 19 · Neck, close up", initial_frame: assets/scenes/cholecystectomy/ep002668_5s.jpg}
+  - {name: chole-20, label: "Cholecystectomy 20 · Fat, close up", initial_frame: assets/scenes/cholecystectomy/ep002790_20s.jpg}
+  - {name: chole-21, label: "Cholecystectomy 21 · Liver bed", initial_frame: assets/scenes/cholecystectomy/ep003500_20s.jpg}
+  - {name: chole-22, label: "Cholecystectomy 22 · Fat at the neck", initial_frame: assets/scenes/cholecystectomy/ep003639_5s.jpg}
+  - {name: chole-23, label: "Cholecystectomy 23 · Liver bed, wide", initial_frame: assets/scenes/cholecystectomy/ep003881_20s.jpg}
+  - {name: chole-24, label: "Cholecystectomy 24 · Liver bed, oozing", initial_frame: assets/scenes/cholecystectomy/ep004427_20s.jpg}
+  - {name: chole-25, label: "Cholecystectomy 25 · Neck with fat", initial_frame: assets/scenes/cholecystectomy/ep004670_35s.jpg}

@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Runs on chole-15, where the left grasper already holds the gallbladder (the scene sets
+# start_jaws_closed: [left]). Demo peaks: drag 0.044 m in 2.5 s -> 0.026 m/s (7% of 0.35),
+# 0.04 m/s² (1% of 3); home 0.044 m in 2 s -> 0.033 m/s. No energy.
+id: drag-the-gallbladder
+course: Starter course
+order: 5
+title: Drag the gallbladder
+scene: chole-15
+brief: >-
+  The left grasper starts out holding the gallbladder. Switch to it (Tab), drag
+  the gallbladder slowly up and to the left, keep holding it for 2 s, then let
+  go (click) and bring the grasper home.
+time_limit_s: 90
+demo:
+  scripted:
+    - {caption: "The grasper is holding the gallbladder", side: left, jaws: close}
+    - {wait_s: 1}
+    - {caption: "Drag up and to the left", side: left, move_to: [-0.18, 1.03, -0.29], over_s: 2.5}
+    - {caption: "Keep holding", wait_s: 2.5}
+    - {caption: "Let go", side: left, jaws: open}
+    - {wait_s: 0.5}
+    - {caption: "Return home", side: left, home: true, over_s: 2.0}
+steps:
+  - {text: "Switch to the left grasper (Tab)", check: {active: left}}
+  - {text: "Drag the gallbladder at least 3 cm, slowly", check: {moved: {side: left, min_m: 0.03}}}
+  - {text: "Keep holding it for 2 s", check: {jaws_closed: {side: left, hold_s: 2}}}
+  - {text: "Let go of the gallbladder (click)", check: {jaws_open: {side: left}}}
+  - {text: "Return the grasper home (R)", check: {home: {side: left}}}
+rubric:
+  - {id: all_steps, text: Completed all steps, points: 30, auto: {all_steps: true}}
+  - {id: no_stops, text: No safety stops, points: 20, auto: {no_safety_stops: true}}
+  - {id: path, text: Within 3 cm of the demo path, points: 20, auto: {max_path_deviation_m: 0.03}}
+  - {id: gentle, text: "Slow, steady drag with the gallbladder staying in the jaws", points: 30}

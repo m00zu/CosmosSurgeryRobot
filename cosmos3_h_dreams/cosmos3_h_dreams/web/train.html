@@ -1,0 +1,560 @@
+<!-- SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved. -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cosmos3-H-Dreams training ground</title>
+  <style>
+    /* Surgical-console theme: near-black panels, one teal accent, red only for REC and stops.
+       You (teal #1f9e8f) and demo (purple #8a6ae0) are a validated pair for charts on --panel. */
+    :root {
+      color-scheme: dark;
+      --bg: #0a0e13; --panel: #0d131a; --raised: #111820; --raised-2: #18212c;
+      --line: #1c2733; --line-2: #2c3a4c;
+      --text: #e6edf3; --soft: #c3ccd8; --muted: #93a1b3; --faint: #5c6b7d;
+      --accent: #3dd6c3; --accent-ink: #062420; --accent-soft: #12202a; --accent-line: #1f4a45;
+      --amber: #f5b83d; --amber-soft: #2a2108; --red: #ff6b6b; --red-text: #ff8a8a; --red-soft: #1a0f12; --red-line: #5a2228;
+      --you: #1f9e8f; --demo: #8a6ae0; --demo-text: #b9a6f5; --demo-soft: #3a3160;
+      --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+      font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    [hidden] { display: none !important; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    body { background: var(--bg); color: var(--text); margin: 0; }
+    main { max-width: 1440px; margin: auto; padding: 0 max(16px, 2vw) 24px; }
+    a { color: var(--accent); }
+    a:hover { color: #8beadf; }
+    h1 { margin: 0; font-size: 1.1em; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+    header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin: 0 0 18px; padding: 12px 18px;
+      background: var(--panel); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 14px 14px; }
+    .spacer { flex: 1; }
+    button { background: var(--accent); border: 1px solid transparent; border-radius: 10px; color: var(--accent-ink); cursor: pointer; font: inherit; font-weight: 600; min-height: 40px; padding: 0 16px; }
+    button:hover:not(:disabled) { filter: brightness(1.08); }
+    button:disabled { background: var(--raised-2); color: var(--faint); cursor: default; }
+    button.quiet { background: transparent; border-color: var(--line-2); color: var(--text); font-weight: 500; }
+    button.quiet:hover:not(:disabled) { background: var(--raised-2); filter: none; }
+    button.quiet:disabled { color: var(--faint); }
+    button.demo-action { background: transparent; border-color: var(--amber); color: var(--amber); }
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    #stop-exercise, #stop:not(:disabled) { background: transparent; border-color: var(--red); color: var(--red-text); }
+    input, select, textarea { background: var(--raised); border: 1px solid var(--line-2); border-radius: 10px; color: inherit; font: inherit; min-height: 40px; padding: 0 12px; box-sizing: border-box; }
+    input[type="range"] { padding: 0; min-height: 0; vertical-align: middle; accent-color: var(--accent); }
+    #recording-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: #3a1518; color: var(--red-text); font: 600 12px var(--mono); }
+    #recording-badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+    .eyebrow, #legend h3, #course-panel h3, #course-list h3, #exercise-detail h4, dialog h3 {
+      color: var(--muted); font: 600 11px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; }
+
+    /* Video on the left, controls card (or the course panel) on the right; one column on narrow screens. */
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-rows: auto auto auto 1fr; column-gap: 20px; align-items: start;
+      grid-template-areas: "stage legend" "playback legend" "notice legend" "resources legend"; }
+    #stage { grid-area: stage; } #playback { grid-area: playback; } #notice { grid-area: notice; } #resources { grid-area: resources; }
+    #legend, #course-panel { grid-area: legend; }
+    .layout:has(#legend[hidden]):has(#course-panel[hidden]) { grid-template-columns: 1fr; grid-template-areas: "stage" "playback" "notice" "resources"; }
+    @media (max-width: 900px) {
+      .layout, .layout:has(#legend[hidden]):has(#course-panel[hidden]) { grid-template-columns: 1fr; grid-template-areas: "stage" "playback" "notice" "legend" "resources"; }
+      #legend, #course-panel { margin-top: 14px; }
+    }
+    #stage { position: relative; }
+    #video { display: block; width: 100%; aspect-ratio: auto 16 / 9; background: black; border: 1px solid var(--line); border-radius: 14px; box-sizing: border-box; cursor: crosshair; user-select: none; }
+    #hud { position: absolute; left: 12px; bottom: 12px; padding: 8px 12px; background: rgb(5 8 11 / 80%); border: 1px solid var(--line-2); border-radius: 10px; font: 12px/1.5 var(--mono); white-space: pre; pointer-events: none; }
+    .veil { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; text-align: center; background: rgb(10 14 19 / 85%); border-radius: 14px; }
+    #overlay { box-shadow: inset 0 0 0 3px var(--faint); }
+    #overlay.incident { box-shadow: inset 0 0 0 3px var(--red); }
+    #overlay h2, #loading h2, #prep h2 { margin: 0; font-size: 1.4em; }
+    /* Shown while the simulation restarts for a demo or exercise; the clock starts once new video runs. */
+    #prep-track { width: min(360px, 70%); height: 8px; border-radius: 4px; background: rgb(255 255 255 / 15%); overflow: hidden; }
+    #prep-bar { width: 0; height: 100%; background: #3987e5; transition: width 0.15s linear; }
+    #prep-text { margin: 0; color: var(--soft); font-size: 0.9em; }
+    #overlay-body, #loading-body { white-space: pre-line; margin: 0; color: var(--soft); font-family: var(--mono); font-size: 0.85em; }
+    #notice { margin: 10px 0 0; padding: 10px 14px; border: 1px solid #4a3a12; background: var(--amber-soft); color: var(--amber); border-radius: 10px; }
+
+    .card, #legend, #course-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; font-size: 0.9em; }
+    #legend h2, #course-panel h2 { font-size: 1.05em; margin: 0 0 8px; }
+    #legend h3, #course-panel h3 { margin: 18px 0 8px; }
+    #legend dl { display: grid; grid-template-columns: 8.6em 1fr; gap: 8px 10px; margin: 0; align-items: baseline; }
+    #legend dt { white-space: nowrap; }
+    #legend dd { margin: 0; color: var(--soft); }
+    #legend .hint { color: var(--muted); margin: 0; }
+    kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; border: 1px solid var(--line-2); border-bottom-width: 3px; border-radius: 6px; background: var(--raised-2); font: 500 0.8em var(--mono); text-align: center; color: var(--text); box-sizing: border-box; }
+    #active { display: flex; gap: 4px; margin-bottom: 8px; padding: 4px; border-radius: 10px; background: var(--raised); border: 1px solid var(--line); }
+    #active span { flex: 1; text-align: center; padding: 6px; border-radius: 7px; color: var(--muted); }
+    #active span[aria-current="true"] { color: var(--text); background: var(--raised-2); font-weight: 600; }
+    /* A tool the active instrument lacks stays listed, dimmed, with the instrument that has it. */
+    #act-keys .unavailable { opacity: 0.45; }
+
+    #resources { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
+    #resources > div:not(#resource-charts):not(#latency), #resource-charts > div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+    #resource-charts { display: contents; }
+    /* Without courses the path guide is hidden and the section is as it was: the two graphs, absent until /api/gpu answers. */
+    #resources:has(#path-guide-panel[hidden]) { grid-template-columns: 1fr 1fr; }
+    #resources:has(#path-guide-panel[hidden]):has(#resource-charts[hidden]):has(#latency[hidden]) { display: none; }
+    /* Generation and response time under the graphs: one row across the section. */
+    #latency { grid-column: 1 / -1; display: grid; grid-template-columns: auto auto 1fr; gap: 2px 10px; align-items: baseline; font: 0.82em var(--mono); color: var(--muted); }
+    #latency strong { font-weight: 600; color: var(--text); font-family: system-ui, sans-serif; }
+    #latency span { color: var(--muted); font-variant-numeric: tabular-nums; }
+    #latency-status { grid-row: 1; grid-column: 3; margin-left: 1.5em; white-space: nowrap; }
+    #latency-status::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; background: var(--faint); }
+    #latency[data-status="ok"] #latency-status::before { background: #199e70; }
+    #latency[data-status="tight"] #latency-status::before { background: var(--amber); }
+    #latency[data-status="behind"] #latency-status::before { background: var(--red); }
+    @media (max-width: 700px) { #latency-status { grid-row: auto; grid-column: 1 / -1; margin-left: 0; } }
+    @media (max-width: 1100px) { #resources { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 700px) { #resources, #resources:has(#path-guide-panel[hidden]) { grid-template-columns: 1fr; } }
+    .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 4px 0 8px; vertical-align: -1px; }
+
+    /* Courses: chips, caption, demo frame and playback bar, course panel, safety meter. */
+    .chip { display: inline-flex; align-items: center; gap: 10px; min-height: 38px; box-sizing: border-box; padding: 0 14px; border-radius: 999px; background: var(--accent-soft); border: 1px solid var(--accent-line); font: 500 13px var(--mono); font-variant-numeric: tabular-nums; }
+    .chip.demo { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); font-weight: 600; letter-spacing: 0.1em; }
+    #stage.demo #video { outline: 3px solid var(--amber); outline-offset: -3px; }
+    #caption { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); max-width: 90%; padding: 10px 18px; background: rgb(5 8 11 / 82%); border: 1px solid var(--line-2); border-radius: 12px; text-align: center; font-weight: 600; pointer-events: none; }
+    #stage.demo #caption { font-size: 1.35em; border-color: var(--amber); }
+    /* Under the step: a hold timer, or the distance and height to the target. */
+    #caption-hold { display: block; margin-top: 4px; color: var(--amber); font: 500 13px var(--mono); font-variant-numeric: tabular-nums; }
+    #caption-hold:empty { display: none; }
+    #playback { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+    #demo-time { font: 13px var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+    #demo-timeline { position: relative; flex: 1; min-width: 160px; height: 32px; background: var(--raised-2); border-radius: 8px; }
+    #demo-timeline .demo-marker { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--amber); }
+    #demo-timeline .demo-marker span { position: absolute; top: 3px; left: 5px; font-size: 0.7em; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #demo-cursor { position: absolute; top: -3px; bottom: -3px; width: 3px; border-radius: 2px; background: var(--text); transform: translateX(-50%); }
+    #playback button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+    #course-panel h2 { color: var(--accent); }
+    #step-list { list-style: none; margin: 0; padding: 0; counter-reset: step; display: flex; flex-direction: column; gap: 6px; }
+    #step-list li { counter-increment: step; display: grid; grid-template-columns: 24px 1fr; column-gap: 10px; padding: 9px 10px; border-radius: 10px; color: var(--muted); }
+    #step-list li::before { content: counter(step); grid-row: span 2; width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--line-2); box-sizing: border-box;
+      display: inline-flex; align-items: center; justify-content: center; font: 600 11px var(--mono); color: var(--faint); }
+    #step-list li.done { color: var(--soft); }
+    #step-list li.done::before { content: "✓"; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-size: 13px; }
+    #step-list li.current { color: var(--text); font-weight: 600; background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line); }
+    #step-list li.current::before { border-color: var(--accent); color: var(--accent); }
+    #step-list .time, #step-list .hint { grid-column: 2; display: block; font: 400 12px var(--mono); color: var(--muted); }
+    .meter-row { display: grid; grid-template-columns: 7.5em 1fr 5em; align-items: center; gap: 8px; margin: 6px 0; font-size: 0.9em; color: var(--soft); }
+    .meter-bar { height: 8px; background: var(--raised-2); border-radius: 4px; overflow: hidden; }
+    .meter-fill { height: 100%; border-radius: 4px; background: var(--faint); }
+    .meter-row[data-level="near"] .meter-fill { background: var(--amber); }
+    .meter-row[data-level="stop"] .meter-fill { background: var(--red); }
+    .meter-text { color: var(--muted); font: 12px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+    .meter-row[data-level="near"] .meter-text { color: var(--amber); }
+    .meter-row[data-level="stop"] .meter-text { color: var(--red-text); }
+    #safety-hint { color: var(--muted); margin: 8px 0 14px; }
+    #show-keys { width: 100%; }
+
+    /* Course menu and report card dialogs. */
+    #course-menu, #report { width: min(1180px, 96vw); padding: 0; }
+    #course-menu .dialog-head, #report .dialog-head { padding: 14px 20px; margin: 0; border-bottom: 1px solid var(--line); }
+    .menu-grid { display: grid; grid-template-columns: 320px 1fr; }
+    @media (max-width: 760px) { .menu-grid { grid-template-columns: 1fr; } #course-list { border-right: 0; border-bottom: 1px solid var(--line); } }
+    #course-list { padding: 14px; border-right: 1px solid var(--line); }
+    #course-list h3 { margin: 14px 6px 8px; }
+    #course-list h3:first-child { margin-top: 4px; }
+    #course-list button { display: grid; grid-template-columns: 1fr auto; column-gap: 10px; align-items: center; width: 100%; text-align: left; margin: 4px 0; padding: 10px 12px;
+      background: transparent; border: 1px solid transparent; color: var(--text); font-weight: 600; }
+    #course-list button:hover { background: var(--raised); filter: none; }
+    #course-list button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+    #course-list .meta { grid-column: 1; display: block; color: var(--muted); font-size: 0.8em; font-weight: 400; }
+    #course-list .best { grid-column: 2; grid-row: 1 / span 2; font: 600 12px var(--mono); color: var(--accent); }
+    #course-list > p.meta { margin: 0 6px; }
+    #exercise-detail { padding: 20px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+    #detail-preview { position: relative; margin: 0; height: min(300px, 32vh); background: black; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    #detail-frame { display: block; width: 100%; height: 100%; object-fit: cover; }
+    #detail-demo { position: absolute; top: 10px; left: 10px; margin: 0; padding: 5px 10px; border-radius: 8px; background: rgb(5 8 11 / 82%); font: 500 12px var(--mono); color: var(--soft); }
+    #detail-path-box { position: absolute; right: 10px; bottom: 10px; width: min(240px, 45%); padding: 8px 10px; border-radius: 10px; background: rgb(5 8 11 / 86%); border: 1px solid var(--line-2); }
+    #detail-path-box .eyebrow { display: flex; justify-content: space-between; font-size: 10px; }
+    #detail-path { display: block; width: 100%; height: auto; margin-top: 4px; }
+    #detail-title { margin: 4px 0 0; font: 600 1.5em system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: 0; text-transform: none; color: var(--text); }
+    #detail-brief { margin: 0; color: var(--soft); }
+    .detail-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+    #exercise-detail h4 { margin: 4px 0 8px; }
+    #detail-steps { list-style: none; margin: 0; padding: 0; counter-reset: step; display: flex; flex-direction: column; gap: 6px; }
+    #detail-steps li { counter-increment: step; display: grid; grid-template-columns: 26px 1fr; font-size: 0.93em; }
+    #detail-steps li::before { content: counter(step, decimal-leading-zero); font: 600 12px/1.6 var(--mono); color: var(--accent); }
+    #detail-rubric { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+    #detail-rubric li { display: grid; grid-template-columns: 58px 1fr auto; gap: 10px; align-items: center; font-size: 0.93em; }
+    .pts { white-space: nowrap; padding: 2px 6px; border-radius: 6px; background: var(--raised-2); text-align: center; font: 600 12px var(--mono); }
+    .kind { font: 500 11px var(--mono); color: var(--muted); }
+    .kind.instructor { color: var(--demo-text); }
+    #detail-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+    #detail-actions button { min-height: 46px; }
+    #start-exercise { padding: 0 24px; font-size: 1.05em; }
+    #detail-note { flex: 1 1 200px; margin: 0; color: var(--amber); font-size: 0.9em; }
+
+    /* Report card. */
+    .report-top { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; padding: 20px 24px; border-bottom: 1px solid var(--line); }
+    #report-ring { flex: none; width: 116px; height: 116px; }
+    .report-head { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+    .report-head h2 { margin: 0; font-size: 1.6em; }
+    #report-summary { margin: 0; color: var(--soft); }
+    #report-pending { margin: 0; color: var(--demo-text); font-size: 0.9em; }
+    #report-pending:empty, #report-delta:empty { display: none; }
+    #report-delta { align-self: flex-start; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line-2); font: 600 12px var(--mono); }
+    #report-delta.up { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
+    #report-delta.down { background: var(--red-soft); border-color: var(--red-line); color: var(--red-text); }
+    .report-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .report-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+    @media (max-width: 860px) { .report-grid { grid-template-columns: 1fr; } .report-grid > section { border-right: 0 !important; } }
+    .report-grid > section { padding: 20px 24px; border-bottom: 1px solid var(--line); min-width: 0; }
+    .report-grid > section:nth-child(odd) { border-right: 1px solid var(--line); }
+    .section-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-bottom: 10px; }
+    .section-head h3 { margin: 0; }
+    .section-head .spacer { flex: 1; }
+    .key { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85em; color: var(--soft); }
+    .key i { display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--you); }
+    .key i.demo { border-top: 2px dashed var(--demo); }
+    .key b { display: inline-block; width: 12px; height: 8px; border-radius: 2px; background: var(--you); }
+    .key b.demo { background: var(--demo); }
+    #report-radar { display: block; width: 100%; max-width: 620px; margin: 0 auto; font-family: system-ui, sans-serif; }
+    #report-radar-note { margin: 6px 0 0; font-size: 0.8em; color: var(--muted); }
+    #report-radar-empty { color: var(--muted); }
+    details.table-view { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 0.85em; }
+    details.table-view summary { cursor: pointer; color: var(--muted); }
+    details.table-view table { width: 100%; margin-top: 8px; border-collapse: collapse; }
+    details.table-view th { text-align: left; font-weight: 500; color: var(--muted); padding: 4px 0; }
+    details.table-view td { padding: 5px 0; border-top: 1px solid var(--line); }
+    details.table-view td:last-child, details.table-view th:last-child { text-align: right; font-family: var(--mono); }
+    #report-rubric { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+    #report-rubric li { display: grid; grid-template-columns: 26px 1fr auto; gap: 2px 12px; align-items: center; padding: 10px 12px; border-radius: 10px; background: var(--raised); }
+    #report-rubric .box { grid-row: span 2; width: 24px; height: 24px; border-radius: 7px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+    #report-rubric .pass .box { background: var(--accent); color: var(--accent-ink); }
+    #report-rubric .fail { background: var(--red-soft); box-shadow: inset 0 0 0 1px var(--red-line); }
+    #report-rubric .fail .box { border: 2px solid var(--red); color: var(--red-text); }
+    #report-rubric .pending .box { border: 2px dashed var(--demo); color: var(--demo-text); font-size: 12px; }
+    #report-rubric .value { grid-column: 2; color: var(--muted); font: 12px var(--mono); }
+    #report-rubric .item-pts { grid-column: 3; grid-row: 1 / span 2; font: 600 13px var(--mono); }
+    #report-rubric .pass .item-pts { color: var(--accent); }
+    #report-rubric .fail .item-pts { color: var(--red-text); }
+    #report-rubric .pending .item-pts { color: var(--demo-text); }
+    .step-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 4px 14px; align-items: center; margin: 8px 0; font-size: 0.85em; color: var(--soft); }
+    .step-bars { display: flex; flex-direction: column; gap: 3px; }
+    .step-bars > div { display: flex; align-items: center; gap: 8px; font: 12px var(--mono); color: var(--muted); }
+    .step-bars > div:first-child { color: var(--text); }
+    .step-bars .bar { height: 10px; border-radius: 0 4px 4px 0; min-width: 2px; }
+    .step-bars .you { background: var(--you); }
+    .step-bars .demo { background: var(--demo); }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+    .tile { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+    .tile span { display: block; color: var(--muted); font: 600 10px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; }
+    .tile strong { display: block; margin-top: 2px; font: 600 1.3em var(--mono); font-variant-numeric: tabular-nums; }
+    .tile span + strong + span { font: 12px var(--mono); letter-spacing: 0; text-transform: none; }
+    #report-dashboard { display: inline-block; margin-top: 14px; }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+    .chart-title { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 0.85em; margin-bottom: 6px; }
+    .chart-title strong { font-weight: 600; }
+    .chart-title span { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .chart-title a { margin-left: auto; }
+    .chart-wrap { position: relative; }
+    .chart { display: block; width: 100%; height: 170px; font-family: system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+    .chart:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .tooltip { position: absolute; pointer-events: none; background: var(--raised-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 6px 10px; font-size: 0.75em; color: var(--soft); white-space: nowrap; }
+    .tooltip strong { color: var(--text); font-variant-numeric: tabular-nums; }
+    .tooltip .tip-time { color: var(--text); margin-bottom: 2px; }
+    .tooltip .tip-key { display: inline-block; width: 12px; height: 2px; margin-right: 6px; vertical-align: middle; }
+
+    dialog { width: min(560px, 90vw); max-height: 90vh; overflow: auto; background: var(--panel); color: var(--text); border: 1px solid var(--line-2); border-radius: 18px; padding: 18px 20px; box-sizing: border-box; }
+    dialog::backdrop { background: rgb(2 4 6 / 78%); }
+    dialog h2 { margin: 0 0 12px; font-size: 1.2em; }
+    .dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    .dialog-head h2 { margin: 0; }
+    #settings section { border-top: 1px solid var(--line); padding: 14px 0; display: flex; flex-direction: column; gap: 8px; }
+    #settings section h3 { margin: 0; }
+    #settings .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    #settings p { margin: 0; color: var(--muted); font-size: 0.9em; }
+    #mode-confirm-text { color: var(--amber); font-size: 0.85em; }
+    #input-rate { width: 5.5em; }
+    #input-rate-budget { color: var(--muted); }
+    #scene-gallery { width: min(850px, 85vw); }
+    #scene-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+    #scene-grid button { margin: 0; padding: 8px; background: var(--raised); color: var(--text); font-weight: 500; border: 2px solid transparent; overflow-wrap: anywhere; height: auto; }
+    #scene-grid button[aria-pressed="true"] { border-color: var(--accent); }
+    #scene-grid img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: black; margin-bottom: 8px; border-radius: 6px; }
+    #scene-grid button:disabled { opacity: 0.6; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3dd6c3" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="2.5"/></svg>Training ground</h1>
+      <button id="courses-button" class="quiet" aria-haspopup="dialog" hidden>Courses</button>
+      <span class="spacer"></span>
+      <span id="exercise-chip" class="chip" hidden></span>
+      <span id="demo-chip" class="chip demo" hidden>DEMO</span>
+      <button id="stop-exercise" hidden>Stop exercise</button>
+      <input id="trainee" placeholder="Trainee name" maxlength="40" aria-label="Trainee name">
+      <button id="start">Start attempt</button>
+      <button id="stop" class="quiet" disabled>Stop</button>
+      <span id="recording-badge" hidden>REC</span>
+      <button id="enter-vr" class="quiet" hidden disabled>Enter VR</button>
+      <button id="settings-button" class="quiet" aria-haspopup="dialog">⚙ Settings</button>
+    </header>
+
+    <div class="layout">
+        <div id="stage">
+          <img id="video" src="/video" alt="Live simulation" data-transport="mjpeg">
+          <div id="hud"></div>
+          <div id="caption" hidden><span id="caption-text"></span><span id="caption-hold"></span></div>
+          <div id="loading" class="veil" hidden>
+            <h2 id="loading-title">Loading model…</h2>
+            <p id="loading-body">The simulation starts when the model is ready.</p>
+          </div>
+          <div id="prep" class="veil" hidden role="status">
+            <h2 id="prep-title"></h2>
+            <div id="prep-track"><div id="prep-bar"></div></div>
+            <p id="prep-text"></p>
+          </div>
+          <div id="overlay" class="veil" hidden>
+            <h2 id="overlay-title"></h2>
+            <p id="overlay-body"></p>
+            <button id="resume">Resume</button>
+          </div>
+        </div>
+        <div id="playback" hidden>
+          <button id="play-pause" class="quiet" type="button">Pause</button>
+          <span id="demo-time">0:00 / 0:00</span>
+          <div id="demo-timeline" aria-label="Demo timeline"><div id="demo-cursor"></div></div>
+          <button id="speed-half" class="quiet" type="button" aria-pressed="false">0.5×</button>
+          <button id="speed-one" class="quiet" type="button" aria-pressed="true">1×</button>
+          <button id="try-it" type="button">Try it yourself</button>
+        </div>
+        <p id="notice" role="alert" hidden></p>
+        <section id="resources" aria-label="Path guide and resource usage, last 5 minutes">
+          <div id="path-guide-panel" hidden>
+            <div class="chart-title"><strong>Path guide</strong><span>top view</span>
+              <span><span class="swatch" style="background:#3987e5"></span>left<span class="swatch" style="background:#199e70"></span>right</span></div>
+            <svg id="path-guide" class="chart" role="img" aria-label="Instrument positions from above, with the demo path and the target zone"></svg>
+          </div>
+          <div id="resource-charts" hidden>
+          <div>
+            <div class="chart-title"><strong>GPU memory</strong><span id="gpu-now">—</span>
+              <a href="/gpu" target="_blank" rel="noopener">GPU monitor ↗</a></div>
+            <div class="chart-wrap">
+              <svg id="gpu-chart" class="chart" role="img" aria-label="GPU memory used, last 5 minutes"></svg>
+              <div id="gpu-tooltip" class="tooltip" hidden></div>
+            </div>
+          </div>
+          <div>
+            <div class="chart-title"><strong>Host RAM (PSS)</strong><span id="host-now">—</span></div>
+            <div class="chart-wrap">
+              <svg id="host-chart" class="chart" role="img" aria-label="Server host RAM, last 5 minutes"></svg>
+              <div id="host-tooltip" class="tooltip" hidden></div>
+            </div>
+          </div>
+          </div>
+          <div id="latency" hidden>
+            <strong>Generation</strong><span id="latency-generation">—</span><span id="latency-status">—</span>
+            <strong>Response</strong><span id="latency-response">—</span>
+          </div>
+        </section>
+
+      <aside id="legend" aria-label="Controls">
+        <h2>Controls</h2>
+        <p class="hint">Click the video to take control · <kbd>Esc</kbd> releases the mouse.</p>
+        <h3>Active instrument</h3>
+        <div id="active"><span data-side="left">Left</span><span data-side="right">Right</span></div>
+        <dl><dt><kbd>Tab</kbd></dt><dd>Switch instrument</dd></dl>
+        <h3>Move</h3>
+        <dl>
+          <dt>Mouse</dt><dd>Left/right, forward/back</dd>
+          <dt>Wheel</dt><dd>Up/down</dd>
+          <dt><kbd>Shift</kbd> + mouse</dt><dd>Tilt</dd>
+          <dt><kbd>Q</kbd> <kbd>E</kbd></dt><dd>Roll</dd>
+        </dl>
+        <h3>Act</h3>
+        <dl id="act-keys">
+          <dt data-tool="jaws">Left click</dt><dd data-tool="jaws">Hold to close the jaws</dd>
+          <dt data-tool="jaws" data-act="lock"><kbd>G</kbd></dt><dd data-tool="jaws" data-act="lock">Lock the jaws closed; they stay closed after Tab</dd>
+          <dt data-tool="energy"><kbd>F</kbd></dt><dd data-tool="energy">Hold for energy</dd>
+        </dl>
+        <h3>Session</h3>
+        <dl>
+          <dt><kbd>R</kbd></dt><dd>Instrument back to start</dd>
+          <dt><kbd>Space</kbd></dt><dd>Pause / resume</dd>
+          <dt><kbd>Backspace</kbd></dt><dd>Reset simulation</dd>
+          <dt><kbd>H</kbd></dt><dd>Hide this card</dd>
+        </dl>
+      </aside>
+
+      <aside id="course-panel" aria-label="Exercise" hidden>
+        <h2 id="course-panel-title"></h2>
+        <h3 id="step-list-title">Steps</h3>
+        <ol id="step-list"></ol>
+        <h3>Safety</h3>
+        <div id="safety-meter"></div>
+        <p id="safety-hint" role="status"></p>
+        <button id="show-keys" class="quiet" type="button">Show keys (H)</button>
+      </aside>
+    </div>
+
+    <dialog id="settings" aria-labelledby="settings-title">
+      <div class="dialog-head">
+        <h2 id="settings-title">Settings</h2>
+        <form method="dialog"><button class="quiet">Close</button></form>
+      </div>
+      <section>
+        <h3>Model mode</h3>
+        <div class="row" id="mode-switch">
+          <select id="mode" aria-label="Model mode">
+            <option value="standard">Standard (best quality)</option>
+            <option value="balanced">Balanced (FP8 MLP, near-Standard quality)</option>
+            <option value="low_memory">Low memory (slightly lower fidelity)</option>
+          </select>
+        </div>
+        <div class="row" id="mode-confirm" hidden>
+          <span id="mode-confirm-text">Switching ends the current attempt and reloads the model.</span>
+          <button id="mode-confirm-button" type="button">Confirm switch</button>
+          <button id="mode-cancel" type="button" class="quiet">Cancel</button>
+        </div>
+      </section>
+      <section>
+        <h3>Input rate</h3>
+        <div class="row">
+          <input id="input-rate" type="number" min="5" max="60" step="1" value="30" disabled
+                 aria-label="Input rate (Hz)" aria-describedby="input-rate-hint"> Hz
+          <span id="input-rate-budget"></span>
+        </div>
+        <p id="input-rate-hint">How often your movement becomes a video frame (default 30; above 30 needs a fast GPU). Lower rates give
+          the GPU more time per chunk, so a slower GPU keeps up, with slightly less smooth motion. A change
+          applies at once (arrows, or type and press Enter) and is not possible during an attempt.</p>
+        <p id="input-rate-advice" role="status" hidden></p>
+      </section>
+      <section>
+        <h3>Sensitivity</h3>
+        <label class="row">Metres per video width
+          <input id="sensitivity" type="range" min="0.02" max="0.3" step="0.01" value="0.1">
+        </label>
+        <label class="row">Up/down per wheel notch (mm)
+          <input id="depth-step" type="range" min="0.5" max="10" step="0.5" value="3">
+        </label>
+        <label class="row">Roll speed, Q/E (rad/s)
+          <input id="roll-speed" type="range" min="0.1" max="1.5" step="0.1" value="0.5">
+        </label>
+      </section>
+      <section>
+        <h3>Scene</h3>
+        <div class="row">
+          <button id="scene-gallery-button" class="quiet" disabled aria-haspopup="dialog">Scene gallery</button>
+          <button id="reset" class="quiet">Reset simulation</button>
+        </div>
+        <p id="scene-status" role="status"></p>
+      </section>
+      <section>
+        <h3>Status</h3>
+        <p id="status" role="status">Connecting…</p>
+        <p id="model-status" role="status">Loading model…</p>
+        <p id="text-cache" hidden></p>
+        <p><a href="/dashboard">Dashboard</a> · <a href="/gpu" target="_blank" rel="noopener">GPU monitor ↗</a></p>
+      </section>
+    </dialog>
+
+    <dialog id="course-menu" aria-labelledby="course-menu-title">
+      <div class="dialog-head">
+        <h2 id="course-menu-title">Courses</h2>
+        <form method="dialog"><button class="quiet">Close</button></form>
+      </div>
+      <div class="menu-grid">
+        <nav id="course-list" aria-label="Exercises"></nav>
+        <section id="exercise-detail" aria-live="polite">
+          <figure id="detail-preview" hidden>
+            <img id="detail-frame" alt="">
+            <p id="detail-demo"></p>
+            <div id="detail-path-box" hidden>
+              <div class="eyebrow"><span>Demo path</span><span>top view</span></div>
+              <svg id="detail-path" role="img" aria-label="The demo's instrument paths from above, with the target zones"></svg>
+            </div>
+          </figure>
+          <h3 id="detail-title">Pick an exercise</h3>
+          <p id="detail-brief"></p>
+          <div class="detail-cols">
+            <div>
+              <h4 id="detail-steps-title">Steps</h4>
+              <ol id="detail-steps"></ol>
+            </div>
+            <div>
+              <h4 id="detail-rubric-title">How it is scored</h4>
+              <ul id="detail-rubric"></ul>
+            </div>
+          </div>
+          <div id="detail-actions">
+            <p id="detail-note" role="status"></p>
+            <button id="watch-demo" class="demo-action" type="button" hidden>▶ Watch demo</button>
+            <button id="start-exercise" type="button" hidden>Start exercise</button>
+          </div>
+        </section>
+      </div>
+    </dialog>
+
+    <dialog id="report" aria-labelledby="report-title">
+      <div class="dialog-head">
+        <span class="eyebrow">Report card</span>
+        <form method="dialog"><button class="quiet">Close</button></form>
+      </div>
+      <div class="report-top">
+        <svg id="report-ring" viewBox="0 0 120 120" role="img"></svg>
+        <div class="report-head">
+          <h2 id="report-title"></h2>
+          <span id="report-delta"></span>
+          <p id="report-summary"></p>
+          <p id="report-pending"></p>
+        </div>
+        <div class="report-actions">
+          <button id="report-demo" class="demo-action" type="button">Watch demo again</button>
+          <button id="report-next" class="quiet" type="button">Next exercise</button>
+          <button id="report-retry" type="button">Retry</button>
+        </div>
+      </div>
+      <div class="report-grid">
+        <section aria-labelledby="report-radar-title">
+          <div class="section-head">
+            <h3 id="report-radar-title">Compared with the demo</h3>
+            <span class="spacer"></span>
+            <span class="key"><i></i>You</span>
+            <span class="key"><i class="demo"></i>Demo level</span>
+          </div>
+          <svg id="report-radar" viewBox="0 0 600 440" role="img" aria-label="Skill scores against the demo level; the same values are in the table below"></svg>
+          <p id="report-radar-empty" hidden>No demo to compare with: only safety is scored.</p>
+          <p id="report-radar-note">Each point is your score on that skill: 100 (the dashed ring) is as good as the demo or better. The coloured number is the change since your last run.</p>
+          <details class="table-view">
+            <summary>Show as table</summary>
+            <table>
+              <thead><tr><th>Skill</th><th>Measured</th><th>Score</th></tr></thead>
+              <tbody id="report-radar-table"></tbody>
+            </table>
+          </details>
+        </section>
+        <section aria-labelledby="report-rubric-title">
+          <div class="section-head"><h3 id="report-rubric-title">Rubric</h3></div>
+          <ul id="report-rubric"></ul>
+        </section>
+        <section aria-labelledby="report-steps-title">
+          <div class="section-head">
+            <h3 id="report-steps-title">Time per step</h3>
+            <span class="spacer"></span>
+            <span class="key"><b></b>You</span>
+            <span class="key"><b class="demo"></b>Demo</span>
+          </div>
+          <div id="report-steps"></div>
+        </section>
+        <section aria-label="Measurements">
+          <div id="report-tiles" class="tiles"></div>
+          <a id="report-dashboard" href="/dashboard">Open in dashboard →</a>
+        </section>
+      </div>
+    </dialog>
+
+    <dialog id="scene-gallery" aria-labelledby="scene-gallery-title">
+      <h2 id="scene-gallery-title">Scene gallery</h2>
+      <form method="dialog"><button>Close</button></form>
+      <p id="scene-gallery-status" role="status"></p>
+      <div id="scene-grid"></div>
+    </dialog>
+  </main>
+  <script src="/scenes.js" defer></script>
+  <script src="/train_core.js" defer></script>
+  <script src="/gpu_chart.js" defer></script>
+  <script src="/train_courses.js" defer></script>
+  <script src="/xr_view.js" defer></script>
+  <script src="/train_vr.js" defer></script>
+  <script src="/train.js" defer></script>
+</body>
+</html>

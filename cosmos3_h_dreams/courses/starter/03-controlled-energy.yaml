@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Demo peaks: home to target 0.091 m in 2 s -> 0.068 m/s (19%), 0.14 m/s² (5%);
+# target to target 0.06 m in 1.5 s -> 0.060 m/s (17%), 0.16 m/s². Energy: two still
+# activations of 2.13 s (21% of 10 s), 4.27 s in 15 s (30% of 14 s), sweep 0 m.
+id: controlled-energy
+course: Starter course
+order: 3
+title: Controlled energy
+brief: >-
+  Apply energy for 2 s at each of two targets with the right hook, keeping it
+  still while energy is on, then return home.
+time_limit_s: 120
+demo:
+  scripted:
+    - {caption: "Start at home", wait_s: 1}
+    - {caption: "First target", side: right, move_to: [0.18, 0.97, -0.38], over_s: 2.0}
+    - {caption: "Energy for 2 s", side: right, energy: "on"}
+    - {wait_s: 2.1}
+    - {side: right, energy: "off"}
+    - {caption: "Second target", side: right, move_to: [0.12, 0.97, -0.38], over_s: 1.5}
+    - {caption: "Energy for 2 s", side: right, energy: "on"}
+    - {wait_s: 2.1}
+    - {side: right, energy: "off"}
+    - {caption: "Return home", side: right, home: true, over_s: 2.0}
+steps:
+  - {text: "Move the right hook to the first target",
+     check: {reach: {side: right, center: [0.18, 0.97, -0.38], radius_m: 0.015}}}
+  - {text: "Hold F for 2 s of energy", check: {energy: {side: right, hold_s: 2}}}
+  - {text: "Move to the second target",
+     check: {reach: {side: right, center: [0.12, 0.97, -0.38], radius_m: 0.015}}}
+  - {text: "Hold F for 2 s of energy", check: {energy: {side: right, hold_s: 2}}}
+  - {text: "Return the hook home (R)", check: {home: {side: right}}}
+rubric:
+  - {id: all_steps, text: Completed all steps, points: 30, auto: {all_steps: true}}
+  - {id: no_stops, text: No safety stops, points: 20, auto: {no_safety_stops: true}}
+  - {id: energy, text: Under 6 s of energy in total, points: 15, auto: {max_energy_s: 6}}
+  - {id: near, text: No near misses, points: 15, auto: {max_near_misses: 0}}
+  - {id: on_target, text: Energy only on the targets, points: 20}

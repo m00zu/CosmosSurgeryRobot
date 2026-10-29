@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Demo peaks: reach 0.106 m in 2 s -> 0.080 m/s (23%), 0.16 m/s² (5%); roll 0.5 rad
+# in 1 s -> 0.75 rad/s (19% of 4); lift 0.06 m in 1.5 s -> 0.060 m/s, 0.16 m/s²;
+# home 0.112 m and 0.5 rad in 2 s -> 0.084 m/s (24%), 0.17 m/s², 0.38 rad/s. No energy.
+id: grasp-and-hold
+course: Starter course
+order: 2
+title: Grasp and hold
+brief: >-
+  Switch to the left grasper (Tab), reach the tissue, roll the wrist, grasp and
+  hold for 3 s, lift it 5 cm, then release and return home.
+time_limit_s: 120
+demo:
+  scripted:
+    - {caption: "Start at home", wait_s: 1}
+    - {caption: "Reach the tissue", side: left, move_to: [-0.12, 0.98, -0.40], over_s: 2.0}
+    - {caption: "Roll the wrist", side: left, rotate_by: [0, 0, 0.5], over_s: 1.0}
+    - {caption: "Grasp and hold", side: left, jaws: close}
+    - {wait_s: 3.5}
+    - {caption: "Lift", side: left, move_to: [-0.12, 1.04, -0.40], over_s: 1.5}
+    - {wait_s: 1}
+    - {caption: "Release", side: left, jaws: open}
+    - {caption: "Return home", side: left, home: true, over_s: 2.0}
+steps:
+  - {text: "Switch to the left grasper (Tab)", check: {active: left}}
+  - {text: "Move the left grasper into the tissue target",
+     check: {reach: {side: left, center: [-0.12, 0.98, -0.40], radius_m: 0.015}}}
+  - {text: "Close the grasper jaws and hold for 3 s", check: {jaws_closed: {side: left, hold_s: 3}}}
+  - {text: "Lift the tissue at least 5 cm (wheel)", check: {moved: {side: left, min_m: 0.05}}}
+  - {text: "Return the grasper home (R)", check: {home: {side: left}}}
+rubric:
+  - {id: all_steps, text: Completed all steps, points: 30, auto: {all_steps: true}}
+  - {id: no_stops, text: No safety stops, points: 20, auto: {no_safety_stops: true}}
+  - {id: path, text: Within 3 cm of the demo path, points: 20, auto: {max_path_deviation_m: 0.03}}
+  - {id: steady, text: Steady grip with no drift while holding, points: 30}

@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Demo peaks (smoothstep: speed 1.5 d/T, acceleration 6 d/T²): reach and return
+# 0.078 m in 1.5 s -> 0.078 m/s (22% of 0.35), 0.21 m/s² (7% of 3). No energy.
+id: instrument-basics
+course: Starter course
+order: 1
+title: Instrument basics
+brief: >-
+  Reach the blue target with the right hook, switch to the left grasper (Tab),
+  close its jaws for 2 s, then bring both instruments home.
+time_limit_s: 90
+demo:
+  scripted:
+    - {caption: "Start at home", wait_s: 1}
+    - {caption: "Reach", side: right, move_to: [0.20, 1.0, -0.36], over_s: 1.5}
+    - {caption: "Switch and grasp", side: left, jaws: close}
+    - {wait_s: 2.5}
+    - {side: left, jaws: open}
+    - {caption: "Return home", side: both, home: true, over_s: 1.5}
+steps:
+  - {text: "Move the right hook into the blue target",
+     check: {reach: {side: right, center: [0.20, 1.0, -0.36], radius_m: 0.015}}}
+  - {text: "Switch to the left grasper (Tab)", check: {active: left}}
+  - {text: "Close the grasper jaws and hold for 2 s", check: {jaws_closed: {side: left, hold_s: 2}}}
+  - {text: "Return both instruments home (R)", check: {home: {side: both}}}
+rubric:
+  - {id: all_steps, text: Completed all steps, points: 30, auto: {all_steps: true}}
+  - {id: no_stops, text: No safety stops, points: 20, auto: {no_safety_stops: true}}
+  - {id: time, text: Finished under 90 s, points: 15, auto: {max_time_s: 90}}
+  - {id: path, text: Within 3 cm of the demo path, points: 15, auto: {max_path_deviation_m: 0.03}}
+  - {id: smooth, text: Smooth movement, points: 20}
